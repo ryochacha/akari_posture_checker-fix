@@ -12,16 +12,30 @@ Akariを使ってリアルタイムで姿勢を分析し、ユーザーの悪い
 ## セットアップ手順
 1.  **リポジトリのクローン**
     ```bash
+    cd
+    ```
+    ```bash
     git clone https://github.com/AkariGroup/akari_posture_checker.git
     cd akari_posture_checker
     ```
 
-2.  **Pythonライブラリのインストール**
+2.  **仮想環境の設定**
+    ```bash
+    python3.10 -m venv venv  
+    source venv/bin/activate
+    ```
+
+3.  **Pythonライブラリのインストール**
     ```bash
     pip install -r requirements.txt
     ```
 
-3. 音声ファイルを配置  
+4.  **モジュールの追加**
+    ```bash
+    ln -s /usr/lib/python3/dist-packages/gi/ {akari_posture_checkerまでのパス}/venv/lib/python3.10/site-packages/
+    ```
+
+5. 音声ファイルを配置  
    `sound` フォルダを作成し、以下の `.wav` ファイルを格納します。  
    ```
    .
