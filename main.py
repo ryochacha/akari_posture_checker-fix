@@ -317,7 +317,7 @@ def main():
                 elapsed = time.time() - state['sitting_start_time']
                 draw_text(img, f"Sitting {hms(elapsed)}", (w-270, h-20), (0,0,0), (255,255,255))
             else:
-                draw_text(img, "Standing 00:00:00", (w-270, h-20), (0,0,0), (255,255,255))
+                draw_text(img, "Standing 00:00:00", (w-300, h-20), (0,0,0), (255,255,255))
             
             # 画面表示と終了処理
             cv2.imshow("Posture Checker", img)
