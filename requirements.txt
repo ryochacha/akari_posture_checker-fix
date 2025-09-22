@@ -3,6 +3,5 @@ akari-proto
 opencv-python
 mediapipe
 depthai==2.30.0
-playsound
 absl-py
-pygobject
+simpleaudio

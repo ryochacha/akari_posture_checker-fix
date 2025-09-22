@@ -30,12 +30,7 @@ Akariを使ってリアルタイムで姿勢を分析し、ユーザーの悪い
     pip install -r requirements.txt
     ```
 
-4.  **モジュールの追加**
-    ```bash
-    ln -s /usr/lib/python3/dist-packages/gi/ {akari_posture_checkerまでのパス}/venv/lib/python3.10/site-packages/
-    ```
-
-5. 音声ファイルを配置  
+4. 音声ファイルを配置  
    `sound` フォルダを作成し、以下の `.wav` ファイルを格納します。  
    ```
    .

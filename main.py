@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""DepthAI + MediaPipe Pose で姿勢チェックを行う完全版スクリプト（関数化版・修正済み）
+"""DepthAI + MediaPipe Pose で姿勢チェックを行う完全版スクリプト（simpleaudio版）
 機能1. 左右自動判定で鼻‐肩‐腰・膝‐腰‐肩の角度を計算
-2. 猫背を 3 回検知すると siren_long.wav をループ再生し続ける ★EDIT
+2. 猫背を 3 回検知すると siren_long.wav をループ再生し続ける
 3. 立ち姿勢へ変化した瞬間だけサウンドを再生（reset.wav）
 4. 1時間以上連続着座すると「Stretch Time!」を画面に表示して siren_long.wav をループ再生
 5. 人物が検出されない間はタイマーとカウンタをリセット
@@ -19,7 +19,7 @@ import cv2
 import mediapipe as mp
 import depthai as dai
 import absl.logging
-from playsound import playsound
+import simpleaudio as sa
 from akari_client import AkariClient
 import threading
 
@@ -42,10 +42,11 @@ SIT_LIMIT_SEC       = 3600          # 1時間以上の連続着座でストレ�
 # ─────────────────────────────────────────────────────────────
 #  ループ音再生用関数
 # ─────────────────────────────────────────────────────────────
-def play_ping_loop(state):
+def play_ping_loop(state, siren_long_wave_obj): # ★ 変更: 再生するオーディオオブジェクトを引数で受け取る
     """ siren_long.wav をループ再生するためのスレッド関数 """
     while state['ping_active']:
-        playsound("sound/siren_long.wav")
+        play_obj = siren_long_wave_obj.play() # ★ 変更: simpleaudio で再生
+        play_obj.wait_done()                  # ★ 変更: 再生が完了するまで待つ
 
 # ─────────────────────────────────────────────────────────────
 #  ユーティリティ関数群
@@ -132,11 +133,12 @@ def setup_depthai_pipeline():
 # ─────────────────────────────────────────────────────────────
 #  状態管理・更新関数
 # ─────────────────────────────────────────────────────────────
-def manage_sound_loop(state, should_be_active):
+def manage_sound_loop(state, should_be_active, siren_long_wave_obj): # ★ 変更: 再生するオーディオオブジェクトを引数で受け取る
     """ サウンドループの状態を管理する（開始・停止） """
     if should_be_active and not state['ping_active']:
         state['ping_active'] = True
-        state['ping_thread'] = threading.Thread(target=play_ping_loop, args=(state,), daemon=True)
+        # ★ 変更: スレッド関数にオーディオオブジェクトを渡す
+        state['ping_thread'] = threading.Thread(target=play_ping_loop, args=(state, siren_long_wave_obj), daemon=True)
         state['ping_thread'].start()
     elif not should_be_active and state['ping_active']:
         state['ping_active'] = False
@@ -145,9 +147,10 @@ def manage_sound_loop(state, should_be_active):
             state['ping_thread'] = None
     return state
 
-def process_landmarks(img, pose_landmarks, state): # <- 変更点: 引数を `lms` から `pose_landmarks` に変更
+# ★ 変更: 再生するオーディオオブジェクトを引数で受け取る
+def process_landmarks(img, pose_landmarks, state, siren_long_obj, siren_short_obj, reset_obj):
     """ 検出されたランドマークを処理し、姿勢を判定・描画する """
-    lms = pose_landmarks.landmark # <- 変更点: 描画で使う親オブジェクトから座標リストを抽出
+    lms = pose_landmarks.landmark
 
     now = time.time()
     side = choose_side(lms)
@@ -180,7 +183,7 @@ def process_landmarks(img, pose_landmarks, state): # <- 変更点: 引数を `lm
 
     # 立ち姿勢への遷移を検出
     if is_stand and not state['prev_is_standing']:
-        playsound("sound/reset.wav")
+        reset_obj.play() # ★ 変更
         state['stand_up_time'] = now
         state['bad_posture_count'] = 0
 
@@ -193,7 +196,7 @@ def process_landmarks(img, pose_landmarks, state): # <- 変更点: 引数を `lm
             if state['consecutive_bad_posture'] >= 3 and now - state['last_detection_time'] >= DETECTION_COOLDOWN:
                 state['bad_posture_count'] += 1
                 state['last_detection_time'] = now
-                playsound("sound/siren_short.wav")
+                siren_short_obj.play() # ★ 変更
                 state['consecutive_bad_posture'] = 0
             draw_text(img, f"Bad Posture! count:{state['bad_posture_count']}", (10,70), (255,255,255), (0,0,200))
         else:
@@ -210,7 +213,8 @@ def process_landmarks(img, pose_landmarks, state): # <- 変更点: 引数を `lm
             print("🧘  1時間以上座り続けています。ストレッチしましょう！")
             state['stretch_prompted'] = True
         draw_text(img, "Stretch Time!", (10,110), (0,0,0), (0,255,255))
-    # bad_posture 3 回超過処理 ★EDIT
+    
+    # bad_posture 3 回超過処理
     is_bad_posture_exceeded = state['bad_posture_count'] >= MAX_COUNTER
     if is_bad_posture_exceeded:
         if not state['ping_active']:
@@ -219,12 +223,12 @@ def process_landmarks(img, pose_landmarks, state): # <- 変更点: 引数を `lm
 
     # サウンドループの制御
     should_ping = is_stretch_time or is_bad_posture_exceeded
-    state = manage_sound_loop(state, should_ping)
+    state = manage_sound_loop(state, should_ping, siren_long_obj) # ★ 変更: オーディオオブジェクトを渡す
     
     # 角度とランドマーク描画
     draw_text(img, f"{side[0].upper()}-deg1:{'N/A' if sit==0 else int(sit)}", (400,70), (20,20,20), (200,200,200) if sit==0 else (250,250,250))
     draw_text(img, f"{side[0].upper()}-deg2:{'N/A' if std==0 else int(std)}", (400,110), (20,20,20), (200,200,200) if std==0 else (250,250,250))
-    mp_drawing.draw_landmarks(img, pose_landmarks, mp_pose.POSE_CONNECTIONS) # <- 変更点: `res.pose_landmarks` を `pose_landmarks` に変更
+    mp_drawing.draw_landmarks(img, pose_landmarks, mp_pose.POSE_CONNECTIONS)
     
     state['prev_is_standing'] = is_stand
     return state
@@ -237,8 +241,8 @@ def handle_no_detection(img, state):
     state['stretch_prompted'] = False
     state['consecutive_bad_posture'] = 0
     state['prev_is_standing'] = False
-    # サウンドループを停止
-    state = manage_sound_loop(state, False)
+    # サウンドループを停止（ここではオーディオオブジェクトは不要）
+    state = manage_sound_loop(state, False, None)
     return state
 
 # ─────────────────────────────────────────────────────────────
@@ -263,6 +267,17 @@ def main():
         'ping_thread': None,
         'ping_active': False
     }
+
+    # ★ 変更: simpleaudio のためにサウンドファイルを事前に読み込む
+    print("🎵  サウンドファイルを読み込んでいます ...")
+    try:
+        siren_long_obj = sa.WaveObject.from_wave_file("sound/siren_long.wav")
+        siren_short_obj = sa.WaveObject.from_wave_file("sound/siren_short.wav")
+        reset_obj = sa.WaveObject.from_wave_file("sound/reset.wav")
+    except FileNotFoundError as e:
+        print(f"エラー: サウンドファイルが見つかりません: {e}", file=sys.stderr)
+        print("'sound' ディレクトリに 'siren_long.wav', 'siren_short.wav', 'reset.wav' が存在することを確認してください。", file=sys.stderr)
+        sys.exit(1)
 
     print("📷  DepthAI カメラ起動中。'q' で終了")
     
@@ -291,7 +306,8 @@ def main():
 
             # 姿勢ランドマークが検出されたかどうかで処理を分岐
             if results.pose_landmarks:
-                state = process_landmarks(img, results.pose_landmarks, state) # <- 変更点: `.landmark` を付けずにオブジェクト全体を渡す
+                # ★ 変更: 読み込んだオーディオオブジェクトを関数に渡す
+                state = process_landmarks(img, results.pose_landmarks, state, siren_long_obj, siren_short_obj, reset_obj)
             else:
                 state = handle_no_detection(img, state)
 
@@ -309,7 +325,7 @@ def main():
                 break
 
     # 終了処理
-    state = manage_sound_loop(state, False)
+    state = manage_sound_loop(state, False, None)
     cv2.destroyAllWindows()
     print("プログラム終了")
 
