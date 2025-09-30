@@ -82,3 +82,15 @@ Akariを使ってリアルタイムで姿勢を分析し、ユーザーの悪い
 
 ## その他
 このアプリケーションは愛知工業大学 情報科学部 知的制御研究室により作成されたものです。  
+本リポジトリで使用しているモデルファイルは、OpenVINO Toolkit の Open Model Zoo から取得したものを変換して利用しています。
+
+- 取得元: [OpenVINO Open Model Zoo](https://storage.openvinotoolkit.org/repositories/open_model_zoo/2021.4/models_bin/1/human-pose-estimation-0001/FP16/)  
+  - [human-pose-estimation-0001.xml](https://storage.openvinotoolkit.org/repositories/open_model_zoo/2021.4/models_bin/1/human-pose-estimation-0001/FP16/human-pose-estimation-0001.xml)  
+  - [human-pose-estimation-0001.bin](https://storage.openvinotoolkit.org/repositories/open_model_zoo/2021.4/models_bin/1/human-pose-estimation-0001/FP16/human-pose-estimation-0001.bin)
+
+これらのファイルは [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0) の下で提供されています。  
+
+また、上記のファイルを元に `create_blob.py` を用いて以下のファイルを生成しています。  
+
+- `human-pose-estimation-0001_openvino_2022.1_6shave.blob`
+
